@@ -73,7 +73,7 @@ function Test-Condition {
 Write-Header "Phase 1: Python 3.11 Verification"
 
 $pythonExists = $null -ne (Get-Command python -ErrorAction SilentlyContinue)
-$pythonVersionOutput = $(python --version 2>&1 | Out-String).Trim
+$pythonVersionOutput = $(python --version 2>&1 | Out-String).Trim()
 
 if ($pythonExists) {
     $pythonVersion = [regex]::Match($pythonVersionOutput, '(\d+\.\d+)').Groups[1].Value
@@ -106,7 +106,7 @@ Test-Condition "pip" $pipExists `
 Write-Header "Phase 2: Node.js 25.8 Verification"
 
 $nodeExists = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-$nodeVersionOutput = $(node --version 2>&1 | Out-String).Trim
+$nodeVersionOutput = $(node --version 2>&1 | Out-String).Trim()
 
 if ($nodeExists) {
     $nodeVersion = [regex]::Match($nodeVersionOutput, 'v(\d+\.\d+)').Groups[1].Value
