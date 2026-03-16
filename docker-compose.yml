@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:9411@localhost:5432/task_tracker
+      TEST_DATABASE_URL: postgresql://postgres:9411@localhost:5432/task_tracker_test
+      AZURE_CLIENT_ID: "0842ec45-61b4-405c-8a1f-f5c8d1b2329a"
+      AZURE_TENANT_ID: "931f45cb-5916-4f22-a21b-af7a33509960"
+      SECRET_KEY: super_secret_key_change_in_production
+      LOG_LEVEL: INFO
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+      VITE_AZURE_CLIENT_ID: "0842ec45-61b4-405c-8a1f-f5c8d1b2329a"
+      VITE_AZURE_TENANT_ID: "931f45cb-5916-4f22-a21b-af7a33509960"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
