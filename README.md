@@ -114,10 +114,26 @@ All list endpoints return a structured envelope with pagination:
 | Variable           | Default                                           | Description                  |
 | ------------------ | ------------------------------------------------- | ---------------------------- |
 | `DATABASE_URL`     | `postgresql://admin:adminpassword@localhost:5432/task_tracker` | PostgreSQL connection |
+| `DATABASE_SSLMODE` | *(empty)*                                         | Optional SSL mode (`require` for Supabase) |
 | `AZURE_CLIENT_ID`  | *(empty)*                                         | Azure App Client ID          |
 | `AZURE_TENANT_ID`  | *(empty)*                                         | Azure Tenant ID              |
 | `SECRET_KEY`       | `super_secret_key_change_in_production`            | JWT signing secret           |
 | `LOG_LEVEL`        | `INFO`                                            | Python log level             |
+
+### Supabase DB Quick Setup
+
+Use your Supabase transaction pooler URI or direct Postgres URI as `DATABASE_URL`.
+
+Example:
+
+```bash
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+DATABASE_SSLMODE=require
+```
+
+Notes:
+- If `DATABASE_URL` host contains `supabase.co`, backend auto-applies `sslmode=require` when not present.
+- If your Supabase URI already contains `?sslmode=require`, you can leave `DATABASE_SSLMODE` empty.
 
 ---
 
