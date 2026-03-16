@@ -10,8 +10,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
-    DATABASE_URL: str = "postgresql://postgres:tasktracker@123@db.hglxcacpawyzikryxanq.supabase.co:5432/postgres"
-    DATABASE_SSLMODE: str = "require"
+    DATABASE_URL: str = "postgresql://postgres:9411@localhost:5432/task_tracker"
 
     AZURE_CLIENT_ID: str = ""
     AZURE_TENANT_ID: str = ""
