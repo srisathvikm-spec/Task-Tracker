@@ -25,6 +25,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _parse_allowed_origins(allowed_origins: str) -> list[str]:
+    """Return normalized CORS origins from a comma-separated env value."""
+    parsed: list[str] = []
+    for origin in allowed_origins.split(","):
+        value = origin.strip().rstrip("/")
+        if value:
+            parsed.append(value)
+    return parsed
+
 # ── App ────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -54,7 +64,7 @@ def startup_initialize() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
+    allow_origins=_parse_allowed_origins(settings.ALLOWED_ORIGINS),
     allow_origin_regex=settings.ALLOWED_ORIGIN_REGEX or None,
     allow_credentials=True,
     allow_methods=["*"],
