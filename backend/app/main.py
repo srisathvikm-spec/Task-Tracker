@@ -25,9 +25,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Create tables (local dev) ─────────────────────────────────────────────
-Base.metadata.create_all(bind=engine)
-
 # ── App ────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -37,6 +34,23 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.on_event("startup")
+def startup_initialize() -> None:
+    """Optional local-only schema initialization.
+
+    In cloud environments the DB may be provisioned independently.
+    We avoid crashing the whole app if DB is temporarily unavailable.
+    """
+    if not settings.AUTO_CREATE_TABLES:
+        logger.info("AUTO_CREATE_TABLES disabled; skipping schema creation")
+        return
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema checked/created successfully")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Schema auto-create failed at startup: %s", exc)
 
 app.add_middleware(
     CORSMiddleware,

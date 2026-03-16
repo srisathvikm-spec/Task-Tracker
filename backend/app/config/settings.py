@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     AZURE_TENANT_ID: str = ""
 
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    AUTO_CREATE_TABLES: bool = False
 
     LOG_LEVEL: str = "INFO"
 
