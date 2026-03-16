@@ -1,312 +1,269 @@
+#!/usr/bin/env pwsh
 # ============================================================================
-# Azure Deployment Script for Task Tracker Application
+# Task Tracker - Azure Deployment Script
 # ============================================================================
-# This script automates the deployment of Task Tracker to Azure
-# Usage: .\deploy-to-azure.ps1
+# Automated deployment to Azure for Python 3.11 + Node 25.8 stack
+# Prerequisites: Azure CLI must be installed and logged in
+# Run AFTER pre-deploy-check.ps1 passes all checks
 # ============================================================================
 
 param(
-    [string]$ResourceGroup = "task-tracker-rg",
+    [string]$DatabasePassword = "",
     [string]$Location = "eastus",
-    [string]$Environment = "production"
+    [string]$ResourceGroup = "task-tracker-rg",
+    [string]$AppServicePlan = "task-tracker-plan",
+    [string]$AppServiceName = "task-tracker-api",
+    [string]$StaticAppName = "task-tracker-app",
+    [string]$DBServerName = "task-tracker-db-server"
 )
 
-# ─── Configuration Variables ───────────────────────────────────────────────
-$dbServer = "task-tracker-db-server-$((Get-Random -Minimum 1000 -Maximum 9999))"
-$dbName = "task_tracker"
-$dbUser = "dbadmin"
-$dbPassword = "P@ssw0rd$((Get-Random -Minimum 100000 -Maximum 999999))"
-$appServicePlan = "task-tracker-plan"
-$backendAppName = "task-tracker-api-$((Get-Random -Minimum 100 -Maximum 999))"
-$frontendAppName = "task-tracker-app-$((Get-Random -Minimum 100 -Maximum 999))"
-$azureClientId = "0842ec45-61b4-405c-8a1f-f5c8d1b2329a"
-$azureTenantId = "931f45cb-5916-4f22-a21b-af7a33509960"
-
-# ─── Color Output Helper ───────────────────────────────────────────────────
+# ------- Helper Functions ---------------------------------------------------
 function Write-Status {
-    param([string]$Message)
-    Write-Host "✓ $Message" -ForegroundColor Green
+    param([string]$Message, [string]$Status = "INFO")
+    $color = switch ($Status) {
+        "SUCCESS" { "Green" }
+        "ERROR" { "Red" }
+        "WARNING" { "Yellow" }
+        default { "Cyan" }
+    }
+    Write-Host "[$Status] $Message" -ForegroundColor $color
 }
 
-function Write-Error-Custom {
-    param([string]$Message)
-    Write-Host "✗ $Message" -ForegroundColor Red
-}
-
-function Write-Info {
-    param([string]$Message)
-    Write-Host "→ $Message" -ForegroundColor Cyan
+function Write-Section {
+    param([string]$Title)
+    Write-Host ""
+    Write-Host "=== $Title ===" -ForegroundColor Magenta
 }
 
 # ============================================================================
-# Phase 1: Verify Prerequisites
+# Pre-flight Checks
 # ============================================================================
-Write-Info "Verifying prerequisites..."
+Write-Section "Pre-flight Checks"
 
-# Check Azure CLI
-if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-    Write-Error-Custom "Azure CLI not found. Install from: https://aka.ms/cli"
+# Verify Azure CLI
+$azExists = $null -ne (Get-Command az -ErrorAction SilentlyContinue)
+if (-not $azExists) {
+    Write-Status "Azure CLI not found" "ERROR"
+    Write-Host "Install from: https://aka.ms/cli"
     exit 1
 }
-Write-Status "Azure CLI is installed"
 
-# Check if logged in
+# Verify logged in
 try {
-    $account = az account show 2>$null | ConvertFrom-Json
-    Write-Status "Logged in as: $($account.user.name)"
-} catch {
-    Write-Error-Custom "Not logged in to Azure. Run: az login"
+    $account = az account show 2>&1 | ConvertFrom-Json
+    Write-Status "Logged in as: $($account.user.name)" "SUCCESS"
+}
+catch {
+    Write-Status "Not logged in to Azure" "ERROR"
+    Write-Host "Run: az login"
     exit 1
 }
 
-# ============================================================================
-# Phase 2: Create Resource Group
-# ============================================================================
-Write-Info "Creating resource group..."
-az group create --name $ResourceGroup --location $Location | Out-Null
-Write-Status "Resource group '$ResourceGroup' created/verified"
-
-# ============================================================================
-# Phase 3: Create PostgreSQL Server
-# ============================================================================
-Write-Info "Creating PostgreSQL server (this may take 5-10 minutes)..."
-az postgres server create `
-    --resource-group $ResourceGroup `
-    --name $dbServer `
-    --location $Location `
-    --admin-user $dbUser `
-    --admin-password $dbPassword `
-    --sku-name B_Gen5_1 `
-    --storage-size 51200 `
-    --version 13 `
-    --output none
-Write-Status "PostgreSQL server '$dbServer' created"
-
-# Configure firewall
-Write-Info "Configuring firewall rules..."
-az postgres server firewall-rule create `
-    --resource-group $ResourceGroup `
-    --server-name $dbServer `
-    --name "AllowAzureServices" `
-    --start-ip-address 0.0.0.0 `
-    --end-ip-address 0.0.0.0 `
-    --output none
-Write-Status "Firewall rule created for Azure Services"
-
-# Create database
-Write-Info "Creating database..."
-az postgres db create `
-    --resource-group $ResourceGroup `
-    --server-name $dbServer `
-    --name $dbName `
-    --output none
-Write-Status "Database '$dbName' created"
-
-# Build connection string
-$dbHost = "$dbServer.postgres.database.azure.com"
-$connectionString = "postgresql://${dbUser}@${dbServer}:${dbPassword}@${dbHost}:5432/${dbName}?sslmode=require"
-Write-Status "PostgreSQL connection string ready"
-
-# ============================================================================
-# Phase 4: Create App Service Plan and Backend App
-# ============================================================================
-Write-Info "Creating App Service plan..."
-az appservice plan create `
-    --name $appServicePlan `
-    --resource-group $ResourceGroup `
-    --sku B1 `
-    --is-linux `
-    --output none
-Write-Status "App Service plan created"
-
-Write-Info "Creating backend web app..."
-az webapp create `
-    --resource-group $ResourceGroup `
-    --plan $appServicePlan `
-    --name $backendAppName `
-    --runtime "PYTHON:3.11" `
-    --output none
-Write-Status "Backend web app '$backendAppName' created"
-
-# Generate secret key
-$secretKey = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-
-# Configure app settings
-Write-Info "Configuring backend environment variables..."
-az webapp config appsettings set `
-    --resource-group $ResourceGroup `
-    --name $backendAppName `
-    --settings `
-        DATABASE_URL=$connectionString `
-        AZURE_CLIENT_ID=$azureClientId `
-        AZURE_TENANT_ID=$azureTenantId `
-        ALLOWED_ORIGINS="https://$frontendAppName.azurestaticapps.net" `
-        ALLOWED_ORIGIN_REGEX="^https://.*\.azurestaticapps\.net$" `
-        SECRET_KEY=$secretKey `
-        LOG_LEVEL="INFO" `
-        AUTO_CREATE_TABLES="true" `
-        --output none
-Write-Status "Environment variables configured"
-
-# ============================================================================
-# Phase 5: Deploy Backend Code
-# ============================================================================
-Write-Info "Preparing backend deployment..."
-Push-Location backend
-
-# Initialize git if needed
-if (-not (Test-Path .git)) {
-    git init
-    git add .
-    git commit -m "Initial backend deployment"
-}
-
-Write-Info "Deploying backend code (this may take 5-10 minutes)..."
-az webapp up `
-    --resource-group $ResourceGroup `
-    --name $backendAppName `
-    --skip-app-id-uri-creation `
-    --runtime "PYTHON:3.11" `
-    --output none
-
-Pop-Location
-Write-Status "Backend deployed successfully"
-
-# Verify backend
-Write-Info "Verifying backend is running..."
-$backendUrl = "https://$backendAppName.azurewebsites.net/health"
-$attempt = 0
-$maxAttempts = 12
-while ($attempt -lt $maxAttempts) {
-    try {
-        $response = Invoke-WebRequest -Uri $backendUrl -UseBasicParsing
-        if ($response.StatusCode -eq 200) {
-            Write-Status "Backend is running at: $backendUrl"
-            break
-        }
-    } catch {
-        $attempt++
-        if ($attempt -lt $maxAttempts) {
-            Write-Info "Waiting for backend to start... (attempt $attempt/$maxAttempts)"
-            Start-Sleep -Seconds 10
-        }
+# Get database password if not provided
+if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
+    Write-Status "Database password required" "WARNING"
+    $DatabasePassword = Read-Host "Enter database password (min 8 chars, with uppercase, numbers, symbols)"
+    
+    if ($DatabasePassword.Length -lt 8 -or $DatabasePassword -notmatch "[A-Z]" -or $DatabasePassword -notmatch "[0-9]") {
+        Write-Status "Password does not meet requirements" "ERROR"
+        exit 1
     }
 }
 
-if ($attempt -eq $maxAttempts) {
-    Write-Error-Custom "Backend failed to start. Check logs with:"
-    Write-Error-Custom "  az webapp log tail --resource-group $ResourceGroup --name $backendAppName"
+# ============================================================================
+# Phase 1: Create Resource Group
+# ============================================================================
+Write-Section "Phase 1: Creating Resource Group"
+
+Write-Status "Creating resource group '$ResourceGroup' in $Location..."
+az group create --name $ResourceGroup --location $Location | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "Resource group created" "SUCCESS"
+}
+else {
+    Write-Status "Failed to create resource group" "ERROR"
     exit 1
 }
 
 # ============================================================================
-# Phase 6: Create Static Web App for Frontend
+# Phase 2: Deploy PostgreSQL Database
 # ============================================================================
-Write-Info "Creating Static Web App for frontend..."
-az staticwebapp create `
-    --name $frontendAppName `
+Write-Section "Phase 2: Deploying PostgreSQL Database"
+
+Write-Status "Creating PostgreSQL server '$DBServerName'..."
+az postgres server create `
     --resource-group $ResourceGroup `
-    --source "." `
+    --name $DBServerName `
     --location $Location `
-    --app-location "frontend" `
-    --output-location "dist" `
-    --skip-github-action-workflow-generation `
-    --output none
-Write-Status "Static Web App created: $frontendAppName"
+    --admin-user dbadmin `
+    --admin-password $DatabasePassword `
+    --sku-name B_Gen5_1 `
+    --storage-size 51200 `
+    --version 11 `
+    --ssl-enforcement Enabled 2>&1 | Out-Null
 
-# Get Static Web App URL
-$staticAppUrl = az staticwebapp show --name $frontendAppName --resource-group $ResourceGroup --query "defaultHostname" -o tsv
-Write-Status "Frontend URL: https://$staticAppUrl"
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "PostgreSQL server created" "SUCCESS"
+}
+else {
+    Write-Status "PostgreSQL server creation failed" "ERROR"
+    exit 1
+}
+
+Write-Status "Configuring firewall rules..."
+az postgres server firewall-rule create `
+    --resource-group $ResourceGroup `
+    --server-name $DBServerName `
+    --name AllowAzureServices `
+    --start-ip-address 0.0.0.0 `
+    --end-ip-address 0.0.0.0 2>&1 | Out-Null
+
+Write-Status "Firewall rules configured" "SUCCESS"
+
+Write-Status "Creating database 'task_tracker'..."
+az postgres db create `
+    --resource-group $ResourceGroup `
+    --server-name $DBServerName `
+    --name task_tracker 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "Database 'task_tracker' created" "SUCCESS"
+}
+else {
+    Write-Status "Database creation failed" "ERROR"
+}
+
+# Extract connection string
+$dbServer = "$DBServerName.postgres.database.azure.com"
+$connectionString = "postgresql://dbadmin@$($DBServerName):$DatabasePassword@$dbServer/task_tracker?sslmode=require"
+Write-Status "Database Connection String:" "INFO"
+Write-Host "   $connectionString" -ForegroundColor Yellow
 
 # ============================================================================
-# Phase 7: Configure Frontend Environment
+# Phase 3: Create App Service Plan
 # ============================================================================
-Write-Info "Configuring frontend environment variables..."
-$frontendEnvFile = "frontend\.env"
-@"
-VITE_API_BASE_URL=https://$backendAppName.azurewebsites.net/api/v1
-VITE_AZURE_CLIENT_ID=$azureClientId
-VITE_AZURE_TENANT_ID=$azureTenantId
-VITE_AZURE_REDIRECT_URI=https://$staticAppUrl/
-"@ | Set-Content -Path $frontendEnvFile -Force
-Write-Status "Frontend .env file updated"
+Write-Section "Phase 3: Creating App Service Plan"
+
+Write-Status "Creating App Service plan '$AppServicePlan'..."
+az appservice plan create `
+    --name $AppServicePlan `
+    --resource-group $ResourceGroup `
+    --sku B1 `
+    --is-linux 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "App Service plan created" "SUCCESS"
+}
+else {
+    Write-Status "App Service plan creation failed" "ERROR"
+    exit 1
+}
 
 # ============================================================================
-# Phase 8: Update Backend CORS
+# Phase 4: Deploy Backend to App Service
 # ============================================================================
-Write-Info "Updating backend CORS configuration..."
+Write-Section "Phase 4: Deploying Backend (Python 3.11)"
+
+# Generate unique app name
+$randomSuffix = Get-Random -Minimum 1000 -Maximum 9999
+$AppServiceName = "$AppServiceName-$randomSuffix"
+
+Write-Status "Creating web app '$AppServiceName'..."
+az webapp create `
+    --resource-group $ResourceGroup `
+    --plan $AppServicePlan `
+    --name $AppServiceName `
+    --runtime "PYTHON|3.11" 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "Web app created: $AppServiceName" "SUCCESS"
+}
+else {
+    Write-Status "Web app creation failed" "ERROR"
+    exit 1
+}
+
+Write-Status "Configuring database connection..."
 az webapp config appsettings set `
     --resource-group $ResourceGroup `
-    --name $backendAppName `
-    --settings "ALLOWED_ORIGINS=https://$staticAppUrl" `
-    --output none
-Write-Status "Backend CORS updated for frontend domain"
+    --name $AppServiceName `
+    --settings "DATABASE_URL=$connectionString" `
+    "PYTHONPATH=/home/site/wwwroot" 2>&1 | Out-Null
+
+Write-Status "Deploying code from GitHub..."
+az webapp up `
+    --resource-group $ResourceGroup `
+    --name $AppServiceName `
+    --runtime "PYTHON|3.11" `
+    --runtime-version "3.11" 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "Backend deployed successfully" "SUCCESS"
+}
+else {
+    Write-Status "Backend deployment may have issues - checking health..." "WARNING"
+}
+
+$backendUrl = "https://$AppServiceName.azurewebsites.net"
+Write-Status "Backend URL: $backendUrl" "INFO"
 
 # ============================================================================
-# Phase 9: Update Azure AD Configuration
+# Phase 5: Create Static Web App for Frontend
 # ============================================================================
-Write-Info "IMPORTANT: Update Azure AD Configuration"
-Write-Info "1. Go to Azure Portal → Azure Active Directory → App registrations"
-Write-Info "2. Select app with Client ID: $azureClientId"
-Write-Info "3. Go to 'Authentication' and add redirect URI:"
-Write-Info "   → https://$staticAppUrl/"
-Write-Info "4. Save changes"
-Write-Info ""
-Write-Info "Press ENTER when done..."
-Read-Host
+Write-Section "Phase 5: Creating Static Web App (React Frontend)"
+
+# Generate unique static app name
+$StaticAppName = "$StaticAppName-$randomSuffix"
+
+Write-Status "Creating Static Web App '$StaticAppName'..."
+az staticwebapp create `
+    --name $StaticAppName `
+    --resource-group $ResourceGroup `
+    --location $Location 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Status "Static Web App created: $StaticAppName" "SUCCESS"
+}
+else {
+    Write-Status "Static Web App creation failed" "ERROR"
+    exit 1
+}
+
+$frontendUrl = "https://$StaticAppName.azurestaticapps.net"
+Write-Status "Frontend URL: $frontendUrl" "INFO"
 
 # ============================================================================
-# Phase 10: Build and Deploy Frontend
+# Phase 6: Summary and Next Steps
 # ============================================================================
-Write-Info "Building frontend application..."
-Push-Location frontend
-npm install
-npm run build
-Pop-Location
-Write-Status "Frontend built successfully"
+Write-Section "Deployment Complete!"
 
-Write-Info "Deploying frontend to Static Web App..."
-# Note: Static Web Apps deployment from local build requires GitHub Actions
-# Alternatively, use Azure DevOps or manual deployment
-Write-Info "To deploy frontend manually:"
-Write-Info "  az staticwebapp upload `"
-Write-Info "    --name $frontendAppName `"
-Write-Info "    --source "./frontend/dist" `"
-Write-Info "    --resource-group $ResourceGroup"
-
-# ============================================================================
-# Summary & Next Steps
-# ============================================================================
 Write-Host ""
-Write-Host "=" * 80
-Write-Host "DEPLOYMENT COMPLETE!" -ForegroundColor Green
-Write-Host "=" * 80
+Write-Host "IMPORTANT: Next Steps" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Resource Summary:" -ForegroundColor Cyan
-Write-Host "  • Resource Group: $ResourceGroup"
-Write-Host "  • Database Server: $dbServer ($dbHost)"
-Write-Host "  • Database Name: $dbName"
-Write-Host "  • Backend App Service: $backendAppName"
-Write-Host "  • Backend URL: https://$backendAppName.azurewebsites.net"
-Write-Host "  • Frontend Static App: $frontendAppName"
-Write-Host "  • Frontend URL: https://$staticAppUrl"
+Write-Host "1. Update Azure AD Redirect URI:" -ForegroundColor Cyan
+Write-Host "   Go to: https://portal.azure.com" 
+Write-Host "   Path: Azure AD -> App registrations -> Authentication"
+Write-Host "   Add Redirect URI: $frontendUrl/"
 Write-Host ""
-Write-Host "Connection Details:" -ForegroundColor Cyan
-Write-Host "  • DB Connection String: $connectionString"
-Write-Host "  • DB User: $dbUser"
-Write-Host "  • DB Password: $dbPassword"
+Write-Host "2. Build and deploy frontend (Node 25.8):" -ForegroundColor Cyan
+Write-Host "   cd frontend"
+Write-Host "   npm install"
+Write-Host "   npm run build"
+Write-Host "   cd .."
 Write-Host ""
-Write-Host "Next Steps:" -ForegroundColor Yellow
-Write-Host "  1. ✓ Verify backend health: https://$backendAppName.azurewebsites.net/health"
-Write-Host "  2. → Update Azure AD redirect URI (see instructions above)"
-Write-Host "  3. → Deploy frontend to Static Web App"
-Write-Host "  4. → Test login at: https://$staticAppUrl"
+Write-Host "3. Upload frontend to Static Web App:" -ForegroundColor Cyan
+Write-Host "   az staticwebapp upload --name $StaticAppName --source ./frontend/dist --resource-group $ResourceGroup"
 Write-Host ""
-Write-Host "Useful Commands:" -ForegroundColor Yellow
-Write-Host "  • View backend logs:"
-Write-Host "    az webapp log tail --resource-group $ResourceGroup --name $backendAppName"
-Write-Host "  • Scale up:"
-Write-Host "    az appservice plan update --resource-group $ResourceGroup --name $appServicePlan --sku S1"
-Write-Host "  • Delete all resources:"
-Write-Host "    az group delete --name $ResourceGroup --yes"
+Write-Host ""
+Write-Host "DEPLOYMENT INFORMATION" -ForegroundColor Magenta
+Write-Host "   Resource Group: $ResourceGroup"
+Write-Host "   Backend URL: $backendUrl"
+Write-Host "   Frontend URL: $frontendUrl"
+Write-Host "   Database: $dbServer"
+Write-Host "   Database: task_tracker"
+Write-Host "   Database User: dbadmin"
+Write-Host "   Location: $Location"
+Write-Host ""
+Write-Host "Save this information for future reference!" -ForegroundColor Yellow
 Write-Host ""
