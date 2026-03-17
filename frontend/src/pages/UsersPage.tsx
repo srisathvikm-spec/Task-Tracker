@@ -44,8 +44,10 @@ const UsersPage: React.FC = () => {
       ]);
       setUsers(usersRes.data.data ?? []);
       setRoles(rolesRes.data.data ?? rolesRes.data ?? []);
-    } catch {
-      message.error('Failed to load user data');
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || 'Failed to load user data';
+      message.error(errorMsg);
+      console.error('Failed to fetch users:', err);
     } finally {
       setLoading(false);
     }

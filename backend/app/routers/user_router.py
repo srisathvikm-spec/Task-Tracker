@@ -144,13 +144,13 @@ def remove_role(
 
 @router.get(
     "/roles/all",
-    summary="List all roles",
-    description="Retrieve the list of available roles. Admin only.",
+    summary="List all roles (All roles)",
+    description="Retrieve the list of available roles. Accessible to all authenticated users.",
     response_description="Array of roles",
 )
 def list_roles(
     db: Session = Depends(get_db),
-    _current: User = Depends(require_admin),
+    _current: User = Depends(require_any),
 ):
     roles = UserService.list_roles(db)
     return success_response(
