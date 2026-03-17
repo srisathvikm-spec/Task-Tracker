@@ -49,6 +49,16 @@ class UserAdminUpdate(BaseModel):
     role_ids: Optional[List[UUID]] = None
 
 
+class UserSummary(BaseModel):
+    """Minimal user info for embedding in other responses."""
+    id: UUID
+    name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserResponse(BaseModel):
     id: UUID
     name: str

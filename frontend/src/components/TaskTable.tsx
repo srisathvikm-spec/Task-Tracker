@@ -73,6 +73,22 @@ const TaskTable: React.FC<Props> = ({ tasks, loading, canEdit, canDelete, onEdit
       render: (dueDate: string) => (dueDate ? new Date(dueDate).toLocaleDateString() : '-'),
     },
     {
+      title: 'Assigned To',
+      dataIndex: ['assigned_to', 'name'],
+      key: 'assigned_to',
+      render: (_: unknown, record: Task) => {
+        if (!record.assigned_to) {
+          return <span style={{ color: '#aaa' }}>-</span>;
+        }
+        return (
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.assigned_to.name}</div>
+            <div style={{ fontSize: '12px', color: '#666' }}>{record.assigned_to.email}</div>
+          </div>
+        );
+      },
+    },
+    {
       title: 'Change Status',
       key: 'change_status',
       render: (_: unknown, record: Task) => (

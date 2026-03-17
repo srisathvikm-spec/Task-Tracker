@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.task import TaskStatus
+from app.schemas.user_schema import UserSummary
 
 
 class _DueDateMixin(BaseModel):
@@ -56,7 +57,7 @@ class TaskResponse(BaseModel):
     due_date: Optional[date] = None
     owner_id: Optional[UUID] = None
     project_id: UUID
-    assigned_to: Optional[UUID] = None
+    assigned_to: Optional[UserSummary] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

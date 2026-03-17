@@ -4,6 +4,12 @@
 
 export type TaskStatus = 'new' | 'not_started' | 'in_progress' | 'blocked' | 'completed';
 
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -12,7 +18,7 @@ export interface Task {
   due_date?: string;
   owner_id?: string;
   project_id: string;
-  assigned_to?: string;
+  assigned_to?: UserSummary;
   created_at: string;
   updated_at?: string;
 }
