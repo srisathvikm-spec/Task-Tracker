@@ -78,6 +78,7 @@ class TaskService:
             due_date=data.due_date,
             project_id=data.project_id,
             owner_id=owner.id,
+            assigned_to=data.assigned_to,
         )
         ActivityLogRepository.create(
             db, task_id=task.id, user_id=owner.id,

@@ -42,13 +42,14 @@ class TaskRepository:
         return query
 
     @staticmethod
-    def create(db: Session, *, title: str, description: Optional[str], due_date: Optional[date], project_id: UUID, owner_id: UUID) -> Task:
+    def create(db: Session, *, title: str, description: Optional[str], due_date: Optional[date], project_id: UUID, owner_id: UUID, assigned_to: Optional[UUID] = None) -> Task:
         task = Task(
             title=title,
             description=description,
             due_date=due_date,
             project_id=project_id,
             owner_id=owner_id,
+            assigned_to=assigned_to,
         )
         db.add(task)
         db.commit()

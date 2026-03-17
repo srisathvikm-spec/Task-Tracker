@@ -2,6 +2,12 @@
  * Core types – Project
  */
 
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -9,6 +15,7 @@ export interface Project {
   start_date?: string;
   end_date?: string;
   owner_id: string;
+  owner?: UserSummary;
   created_at: string;
 }
 

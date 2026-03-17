@@ -28,4 +28,5 @@ export interface TaskCreate {
   description?: string;
   due_date?: string;
   project_id: string;
+  assigned_to?: string;
 }

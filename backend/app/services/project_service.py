@@ -38,8 +38,19 @@ class ProjectService:
         *,
         name_filter: Optional[str] = None,
         owner_id: Optional[UUID] = None,
+        current_user: Optional[User] = None,
     ) -> PaginatedResult:
         query = ProjectRepository.query_all(db)
+        
+        # Read-only users see only projects where they have assigned tasks
+        if current_user:
+            roles = {r.name for r in current_user.roles}
+            is_privileged = bool(roles & {"Admin", "Manager"})
+            if not is_privileged and "Read Only User" in roles:
+                # Join with tasks to get projects where user has assigned tasks
+                from app.models.task import Task
+                query = query.join(Task).filter(Task.assigned_to == current_user.id).distinct()
+        
         if name_filter:
             query = query.filter(Project.name.ilike(f"%{name_filter}%"))
         if owner_id:

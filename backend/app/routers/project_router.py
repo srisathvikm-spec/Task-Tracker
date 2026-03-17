@@ -22,7 +22,7 @@ router = APIRouter()
 @router.get(
     "/",
     summary="List projects (all roles)",
-    description="Paginated project listing with optional filtering by name or owner UUID.",
+    description="Paginated project listing with optional filtering by name or owner UUID. Read-only users see only projects with their assigned tasks.",
     response_description="Paginated array of projects",
 )
 def list_projects(
@@ -31,11 +31,11 @@ def list_projects(
     name: Optional[str] = Query(None, description="Filter by project name (partial match)"),
     owner_id: Optional[UUID] = Query(None, description="Filter by owner UUID"),
     db: Session = Depends(get_db),
-    _current: User = Depends(require_any),
+    current: User = Depends(require_any),
 ):
     result = ProjectService.list_projects(
         db, PaginationParams(page=page, limit=limit),
-        name_filter=name, owner_id=owner_id,
+        name_filter=name, owner_id=owner_id, current_user=current,
     )
     return success_response(
         data=[ProjectResponse.model_validate(p).model_dump() for p in result.items],

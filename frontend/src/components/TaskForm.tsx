@@ -6,17 +6,20 @@ import React, { useEffect } from 'react';
 import { Modal, Form, Input, DatePicker, Select } from 'antd';
 import type { Task, TaskCreate } from '../types/task';
 import type { Project } from '../types/project';
+import type { User } from '../types/user';
 import dayjs from 'dayjs';
 
 interface Props {
   open: boolean;
   task?: Task | null;
   projects: Project[];
+  users: User[];
+  canAssign: boolean;
   onSubmit: (values: TaskCreate) => void;
   onCancel: () => void;
 }
 
-const TaskForm: React.FC<Props> = ({ open, task, projects, onSubmit, onCancel }) => {
+const TaskForm: React.FC<Props> = ({ open, task, projects, users, canAssign, onSubmit, onCancel }) => {
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -27,6 +30,7 @@ const TaskForm: React.FC<Props> = ({ open, task, projects, onSubmit, onCancel })
           description: task.description,
           due_date: task.due_date ? dayjs(task.due_date) : undefined,
           project_id: task.project_id,
+          assigned_to: task.assigned_to?.id,
         });
       } else {
         form.resetFields();
@@ -67,6 +71,18 @@ const TaskForm: React.FC<Props> = ({ open, task, projects, onSubmit, onCancel })
             options={projects.map((p) => ({ label: p.name, value: p.id }))}
           />
         </Form.Item>
+        {canAssign && (
+          <Form.Item name="assigned_to" label="Assign To">
+            <Select
+              placeholder="Unassigned"
+              allowClear
+              options={users.map((u) => ({
+                label: `${u.name} (${u.email})`,
+                value: u.id,
+              }))}
+            />
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );

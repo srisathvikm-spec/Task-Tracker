@@ -7,6 +7,7 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+from app.schemas.user_schema import UserSummary
 
 
 class ProjectCreate(BaseModel):
@@ -42,6 +43,7 @@ class ProjectResponse(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     owner_id: UUID
+    owner: Optional[UserSummary] = None
     created_at: datetime
 
     class Config:

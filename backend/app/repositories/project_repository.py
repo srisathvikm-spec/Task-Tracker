@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy.orm import Session, Query
+from sqlalchemy.orm import Session, Query, joinedload
 
 from app.models.project import Project
 
@@ -15,12 +15,12 @@ class ProjectRepository:
 
     @staticmethod
     def get_by_id(db: Session, project_id: UUID) -> Optional[Project]:
-        return db.query(Project).filter(Project.id == project_id).first()
+        return db.query(Project).options(joinedload(Project.owner)).filter(Project.id == project_id).first()
 
     @staticmethod
     def query_all(db: Session) -> Query:
         """Return base query – caller can add filters / pagination."""
-        return db.query(Project).order_by(Project.created_at.desc())
+        return db.query(Project).options(joinedload(Project.owner)).order_by(Project.created_at.desc())
 
     @staticmethod
     def create(db: Session, *, name: str, description: Optional[str], start_date: Any, end_date: Any, owner_id: UUID) -> Project:
@@ -34,6 +34,7 @@ class ProjectRepository:
         db.add(project)
         db.commit()
         db.refresh(project)
+        db.refresh(project, ['owner'])
         return project
 
     @staticmethod
@@ -42,6 +43,7 @@ class ProjectRepository:
             setattr(project, key, val)
         db.commit()
         db.refresh(project)
+        db.refresh(project, ['owner'])
         return project
 
     @staticmethod

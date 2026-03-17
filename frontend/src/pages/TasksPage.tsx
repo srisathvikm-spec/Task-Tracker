@@ -8,11 +8,13 @@ import apiClient from '../api/apiClient';
 import { useAuth } from '../hooks/useAuth';
 import type { Task, TaskCreate } from '../types/task';
 import type { Project } from '../types/project';
+import type { User } from '../types/user';
 
 const TasksPage: React.FC = () => {
   const { isManager, isAdmin } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -45,9 +47,19 @@ const TasksPage: React.FC = () => {
     setProjects(data.data ?? []);
   };
 
+  const fetchUsers = async () => {
+    try {
+      const { data } = await apiClient.get('/users/');
+      setUsers(data.data ?? []);
+    } catch {
+      message.error('Failed to fetch users');
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
     fetchProjects();
+    fetchUsers();
   }, [statusFilter, projectFilter, sortBy]);
 
   const handleSubmit = async (values: TaskCreate) => {
@@ -171,6 +183,8 @@ const TasksPage: React.FC = () => {
         open={modalOpen}
         task={editing}
         projects={projects}
+        users={users}
+        canAssign={isManager || isAdmin}
         onSubmit={handleSubmit}
         onCancel={() => setModalOpen(false)}
       />

@@ -28,6 +28,22 @@ const ProjectTable: React.FC<Props> = ({ projects, loading, canEdit, canDelete, 
       ellipsis: true,
       render: (description: string) => <span style={{ color: 'var(--text-dim)' }}>{description || '-'}</span>,
     },
+    {
+      title: 'Owner',
+      dataIndex: ['owner', 'name'],
+      key: 'owner',
+      render: (_: unknown, record: Project) => {
+        if (!record.owner) {
+          return <span style={{ color: '#aaa' }}>-</span>;
+        }
+        return (
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.owner.name}</div>
+            <div style={{ fontSize: '12px', color: '#666' }}>{record.owner.email}</div>
+          </div>
+        );
+      },
+    },
     { title: 'Start Date', dataIndex: 'start_date', key: 'start_date' },
     { title: 'End Date', dataIndex: 'end_date', key: 'end_date' },
     {

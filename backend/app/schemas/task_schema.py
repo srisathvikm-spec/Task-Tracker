@@ -28,6 +28,7 @@ class TaskCreate(_DueDateMixin):
     description: Optional[str] = Field(None, max_length=2000, description="Task description")
     due_date: Optional[date] = Field(None, description="Due date (cannot be in the past)")
     project_id: UUID = Field(..., description="UUID of the parent project")
+    assigned_to: Optional[UUID] = Field(None, description="UUID of the assignee")
 
 
 class TaskUpdate(_DueDateMixin):
