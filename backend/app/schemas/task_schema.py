@@ -57,9 +57,10 @@ class TaskResponse(BaseModel):
     due_date: Optional[date] = None
     owner_id: Optional[UUID] = None
     project_id: UUID
-    assigned_to: Optional[UserSummary] = None
+    assigned_to: Optional[UserSummary] = Field(None, alias='assignee')
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+        populate_by_name = True
