@@ -32,7 +32,7 @@ const AppRoutes: React.FC = () => (
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/tasks" element={<TasksPage />} />
-      <Route path="/users" element={<ProtectedRoute requireAdmin><UsersPage /></ProtectedRoute>} />
+      <Route path="/users" element={<UsersPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Routes>

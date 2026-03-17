@@ -15,13 +15,13 @@ const { Header, Content } = Layout;
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/projects', icon: <ProjectOutlined />, label: 'Projects' },
     { key: '/tasks', icon: <CheckSquareOutlined />, label: 'Tasks' },
-    ...(isAdmin ? [{ key: '/users', icon: <TeamOutlined />, label: 'Users' }] : []),
+    { key: '/users', icon: <TeamOutlined />, label: 'Users' },
   ];
 
   return (

@@ -14,12 +14,15 @@ import {
   Popconfirm,
   Tooltip,
   Switch,
+  Alert,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import apiClient from '../api/apiClient';
+import { useAuth } from '../hooks/useAuth';
 import type { User, Role } from '../types/user';
 
 const UsersPage: React.FC = () => {
+  const { isAdmin, isManager, isReadOnlyUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
@@ -145,11 +148,11 @@ const UsersPage: React.FC = () => {
       render: (_: unknown, record: User) => (
         <Space size={[0, 6]} wrap>
           {record.roles.map((role) => (
-            <Tooltip key={role.id} title={record.roles.length <= 1 ? 'User must have at least one role' : 'Click x to remove role'}>
+            <Tooltip key={role.id} title={(isManager && !isReadOnlyUser) ? (record.roles.length <= 1 ? 'User must have at least one role' : 'Click x to remove role') : 'View only'}>
               <Tag
                 color="processing"
                 bordered={false}
-                closable={record.roles.length > 1}
+                closable={isManager && !isReadOnlyUser && record.roles.length > 1}
                 onClose={(e) => {
                   e.preventDefault();
                   handleRemoveRole(record.id, role.id);
@@ -170,41 +173,56 @@ const UsersPage: React.FC = () => {
         <Badge status={isActive ? 'success' : 'error'} text={isActive ? 'Active' : 'Disabled'} />
       ),
     },
-    {
-      title: 'Edit',
-      key: 'edit',
-      render: (_: unknown, record: User) => (
-        <Button icon={<EditOutlined />} size="small" onClick={() => openEdit(record)} />
-      ),
-    },
-    {
-      title: 'Delete',
-      key: 'delete',
-      render: (_: unknown, record: User) => (
-        <Popconfirm title="Delete this user?" onConfirm={() => handleDeleteUser(record.id)}>
-          <Button danger icon={<DeleteOutlined />} size="small" />
-        </Popconfirm>
-      ),
-    },
+    ...(isManager && !isReadOnlyUser ? [
+      {
+        title: 'Edit',
+        key: 'edit',
+        render: (_: unknown, record: User) => (
+          <Button icon={<EditOutlined />} size="small" onClick={() => openEdit(record)} />
+        ),
+      },
+    ] : []),
+    ...(isAdmin ? [
+      {
+        title: 'Delete',
+        key: 'delete',
+        render: (_: unknown, record: User) => (
+          <Popconfirm title="Delete this user?" onConfirm={() => handleDeleteUser(record.id)}>
+            <Button danger icon={<DeleteOutlined />} size="small" />
+          </Popconfirm>
+        ),
+      },
+    ] : []),
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {isReadOnlyUser && (
+        <Alert
+          message="View Only Access"
+          description="You have read-only access to the Users page. You can view user information but cannot make changes."
+          type="info"
+          showIcon
+        />
+      )}
+
       <section className="page-hero">
         <div>
           <h2 className="page-title">Users</h2>
           <div className="page-meta">Govern permissions, assign roles, and maintain secure access.</div>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            creatingForm.resetFields();
-            setCreateOpen(true);
-          }}
-        >
-          Create User
-        </Button>
+        {(isManager && !isReadOnlyUser) && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              creatingForm.resetFields();
+              setCreateOpen(true);
+            }}
+          >
+            Create User
+          </Button>
+        )}
       </section>
 
       <section className="glass-card panel" style={{ paddingTop: 10 }}>
@@ -224,14 +242,15 @@ const UsersPage: React.FC = () => {
       >
         <Form form={creatingForm} layout="vertical" style={{ marginTop: 12 }}>
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
-            <Input placeholder="Enter name" />
+            <Input placeholder="Enter name" disabled={isReadOnlyUser} />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Enter a valid email' }]}>
-            <Input placeholder="Enter email" />
+            <Input placeholder="Enter email" disabled={isReadOnlyUser} />
           </Form.Item>
           <Form.Item name="role_id" label="Role" rules={[{ required: true, message: 'Role is required' }]}>
             <Select
               placeholder="Select role"
+              disabled={isReadOnlyUser}
               options={roles.map((role) => ({ label: role.name, value: role.id }))}
             />
           </Form.Item>
@@ -243,7 +262,7 @@ const UsersPage: React.FC = () => {
         open={editOpen}
         onOk={handleEditUser}
         okText="Update"
-        okButtonProps={{ loading: submitting }}
+        okButtonProps={{ loading: submitting, disabled: isReadOnlyUser }}
         onCancel={() => {
           setEditOpen(false);
           setEditingUser(null);
@@ -252,13 +271,13 @@ const UsersPage: React.FC = () => {
       >
         <Form form={editingForm} layout="vertical" style={{ marginTop: 12 }}>
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
-            <Input placeholder="Enter name" />
+            <Input placeholder="Enter name" disabled={isReadOnlyUser} />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Enter a valid email' }]}>
-            <Input placeholder="Enter email" />
+            <Input placeholder="Enter email" disabled={isReadOnlyUser} />
           </Form.Item>
           <Form.Item name="is_active" label="Status" valuePropName="checked">
-            <Switch checkedChildren="Active" unCheckedChildren="Disabled" />
+            <Switch checkedChildren="Active" unCheckedChildren="Disabled" disabled={isReadOnlyUser} />
           </Form.Item>
           <Form.Item
             name="role_ids"
@@ -268,6 +287,7 @@ const UsersPage: React.FC = () => {
             <Select
               mode="multiple"
               placeholder="Select roles"
+              disabled={isReadOnlyUser}
               options={roles.map((role) => ({ label: role.name, value: role.id }))}
             />
           </Form.Item>

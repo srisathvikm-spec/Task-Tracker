@@ -1,4 +1,4 @@
-"""User management router – Admin only."""
+"""User management router – Role-based access control."""
 
 from typing import List
 from uuid import UUID
@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.rbac import require_admin
+from app.core.rbac import require_admin, require_manager, require_any
 from app.core.security import get_db
 from app.models.user import User
 from app.schemas.user_schema import UserResponse, UserCreateWithRole, UserAdminUpdate, UserUpdate, RoleAssign, RoleResponse
@@ -19,14 +19,14 @@ router = APIRouter()
 
 @router.post(
     "/",
-    summary="Create user (Admin)",
-    description="Create a new user and assign a role. Admin only.",
+    summary="Create user (Manager+)",
+    description="Create a new user and assign a role. Requires Manager or Admin role.",
     response_description="Created user",
 )
 def create_user(
     body: UserCreateWithRole,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_admin),
+    _current: User = Depends(require_manager),
 ):
     user = UserService.create_user(db, body)
     return success_response(
@@ -37,15 +37,15 @@ def create_user(
 
 @router.get(
     "/",
-    summary="List all users (Admin)",
-    description="Paginated list of all users. Admin only.",
+    summary="List all users (All roles)",
+    description="Paginated list of all users. Accessible to all authenticated users. Read-only users can only view.",
     response_description="Paginated array of users",
 )
 def list_users(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
-    _current: User = Depends(require_admin),
+    _current: User = Depends(require_any),
 ):
     result = UserService.list_users(db, PaginationParams(page=page, limit=limit))
     return success_response(
@@ -56,14 +56,14 @@ def list_users(
 
 @router.get(
     "/{user_id}",
-    summary="Get user by ID (Admin)",
-    description="Retrieve a single user by UUID. Admin only.",
+    summary="Get user by ID (All roles)",
+    description="Retrieve a single user by UUID. Accessible to all authenticated users.",
     response_description="User details",
 )
 def get_user(
     user_id: UUID,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_admin),
+    _current: User = Depends(require_any),
 ):
     user = UserService.get_user(db, user_id)
     return success_response(data=UserResponse.model_validate(user).model_dump())
@@ -71,15 +71,15 @@ def get_user(
 
 @router.patch(
     "/{user_id}",
-    summary="Update user details and roles (Admin)",
-    description="Update user profile fields and replace assigned roles. Admin only.",
+    summary="Update user details and roles (Manager+)",
+    description="Update user profile fields and replace assigned roles. Requires Manager or Admin role.",
     response_description="Updated user",
 )
 def update_user_admin(
     user_id: UUID,
     body: UserAdminUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_admin),
+    _current: User = Depends(require_manager),
 ):
     user = UserService.admin_update_user(db, user_id, body)
     return success_response(
@@ -91,7 +91,7 @@ def update_user_admin(
 @router.delete(
     "/{user_id}",
     summary="Delete user (Admin)",
-    description="Delete a user by UUID. Admin only.",
+    description="Delete a user by UUID. Admin only. Cannot delete own account.",
 )
 def delete_user(
     user_id: UUID,
